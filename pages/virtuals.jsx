@@ -10,19 +10,45 @@ export default function VirtualsList() {
       try {
         const apiUrl =
           "https://api2.virtuals.io/api/virtuals?filters[status]=5&filters[chain]=BASE&sort[0]=virtualTokenValue:desc&sort[1]=createdAt:desc&populate[0]=image&populate[1]=genesis&populate[2]=creator&pagination[page]=1&pagination[pageSize]=100";
+
         const res = await fetch(apiUrl);
         const json = await res.json();
         const data = json.data || [];
 
         const formatted = data.map((t) => {
-          const attr = t.attributes || {};
+          const a = t.attributes || {};
+          const price =
+            Number(
+              a.virtualTokenValue ??
+                a.virtualTokenPrice ??
+                a.tokenValue ??
+                0
+            );
+          const change =
+            Number(
+              a.virtualTokenChange24h ??
+                a.virtualTokenPriceChange24h ??
+                a.priceChange24h ??
+                0
+            );
+          const fdv =
+            Number(
+              a.virtualTokenFDV ??
+                a.fdv ??
+                a.marketCap ??
+                0
+            );
+
           return {
             id: t.id,
-            name: attr.symbol || attr.name || "Unknown",
-            price: Number(attr.virtualTokenValue || 0),
-            change24h: Number(attr.virtualTokenChange24h || 0),
-            fdv: Number(attr.virtualTokenFDV || 0),
-            image: attr.image?.data?.attributes?.url || null,
+            name: a.symbol || a.name || "Unknown",
+            price,
+            change24h: change,
+            fdv,
+            image:
+              a.image?.data?.attributes?.url ||
+              a.image?.url ||
+              null,
           };
         });
 
@@ -36,13 +62,12 @@ export default function VirtualsList() {
     fetchVirtuals();
   }, []);
 
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-gray-400 text-lg">
-        Fetching Virtual tokens...
+        Loading Virtuals...
       </div>
     );
-  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white p-6">
@@ -80,7 +105,9 @@ export default function VirtualsList() {
                   )}
                   <span className="font-medium">{t.name}</span>
                 </td>
-                <td className="p-2 text-right">${t.price.toFixed(6)}</td>
+                <td className="p-2 text-right">
+                  ${t.price.toFixed(6)}
+                </td>
                 <td
                   className={`p-2 text-right font-semibold ${
                     t.change24h >= 0 ? "text-green-400" : "text-red-400"
