@@ -6,6 +6,7 @@ export default async function handler(req, res) {
     const response = await fetch(apiUrl);
     const data = await response.json();
 
+    // Cache 1 dk, revalidate 30 sn
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
     res.status(200).json(data);
   } catch (error) {
