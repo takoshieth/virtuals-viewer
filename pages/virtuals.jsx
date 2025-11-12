@@ -8,10 +8,8 @@ export default function VirtualsList() {
     async function fetchVirtuals() {
       setLoading(true);
       try {
-        const apiUrl =
-          "https://api2.virtuals.io/api/virtuals?filters[status]=5&filters[chain]=BASE&sort[0]=virtualTokenValue:desc&sort[1]=createdAt:desc&populate[0]=image&populate[1]=genesis&populate[2]=creator&pagination[page]=1&pagination[pageSize]=100";
-
-        const res = await fetch(apiUrl);
+        // Artık doğrudan API'ye değil, kendi proxy'imize istek atıyoruz
+        const res = await fetch("/api/virtuals");
         const json = await res.json();
         const data = json.data || [];
 
