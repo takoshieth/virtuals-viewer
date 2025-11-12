@@ -1,130 +1,40 @@
 import { useEffect, useState } from "react";
 
-export default function VirtualsList() {
+export default function VirtualTokens() {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchVirtuals() {
+    async function fetchData() {
       setLoading(true);
       try {
-        // Artık doğrudan API'ye değil, kendi proxy'imize istek atıyoruz
-        const res = await fetch("/api/virtuals");
-        const json = await res.json();
-        const data = json.data || [];
+        // 1️⃣ Virtuals API'den tokenleri çek
+        const virtualsRes = await fetch(
+          "https://api2.virtuals.io/api/virtuals?filters[status]=5&filters[chain]=BASE&pagination[pageSize]=50"
+        );
+        const virtualsData = await virtualsRes.json();
 
-        const formatted = data.map((t) => {
-          const a = t.attributes || {};
-          const price =
-            Number(
-              a.virtualTokenValue ??
-                a.virtualTokenPrice ??
-                a.tokenValue ??
-                0
-            );
-          const change =
-            Number(
-              a.virtualTokenChange24h ??
-                a.virtualTokenPriceChange24h ??
-                a.priceChange24h ??
-                0
-            );
-          const fdv =
-            Number(
-              a.virtualTokenFDV ??
-                a.fdv ??
-                a.marketCap ??
-                0
-            );
-
+        const rawTokens = (virtualsData?.data || []).map((item) => {
+          const a = item.attributes || {};
           return {
-            id: t.id,
-            name: a.symbol || a.name || "Unknown",
-            price,
-            change24h: change,
-            fdv,
-            image:
-              a.image?.data?.attributes?.url ||
-              a.image?.url ||
-              null,
+            id: item.id,
+            name: a.name || a.symbol || "Unknown",
+            symbol: a.symbol || "???",
+            lp: a.lpAddress,
+            tokenAddress: a.tokenAddress,
           };
         });
 
-        setTokens(formatted);
-      } catch (err) {
-        console.error("Virtuals API Error:", err);
-      }
-      setLoading(false);
-    }
-
-    fetchVirtuals();
-  }, []);
-
-  if (loading)
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-gray-400 text-lg">
-        Loading Virtuals...
-      </div>
-    );
-
-  return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white p-6">
-      <h1 className="text-3xl font-bold mb-6 text-center text-emerald-400">
-        Virtual Protocol Tokens
-      </h1>
-
-      <div className="overflow-x-auto">
-        <table className="min-w-full border border-gray-700 rounded-xl text-sm">
-          <thead className="bg-gray-900 text-gray-400 uppercase text-xs">
-            <tr>
-              <th className="p-2 text-left">#</th>
-              <th className="p-2 text-left">Token</th>
-              <th className="p-2 text-right">Price (USD)</th>
-              <th className="p-2 text-right">24h Change</th>
-              <th className="p-2 text-right">FDV</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tokens.map((t, i) => (
-              <tr
-                key={t.id}
-                className="border-t border-gray-800 hover:bg-gray-800 transition"
-              >
-                <td className="p-2 text-gray-500">{i + 1}</td>
-                <td className="p-2 flex items-center gap-2">
-                  {t.image ? (
-                    <img
-                      src={t.image}
-                      alt={t.name}
-                      className="w-6 h-6 rounded-full"
-                    />
-                  ) : (
-                    <div className="w-6 h-6 bg-gray-600 rounded-full" />
-                  )}
-                  <span className="font-medium">{t.name}</span>
-                </td>
-                <td className="p-2 text-right">
-                  ${t.price.toFixed(6)}
-                </td>
-                <td
-                  className={`p-2 text-right font-semibold ${
-                    t.change24h >= 0 ? "text-green-400" : "text-red-400"
-                  }`}
-                >
-                  {t.change24h.toFixed(2)}%
-                </td>
-                <td className="p-2 text-right text-gray-300">
-                  ${t.fdv.toLocaleString()}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <p className="text-center text-gray-500 mt-6">
-        Showing {tokens.length} tokens — Data from Virtuals Protocol API
-      </p>
-    </div>
-  );
-}
+        // 2️⃣ Her token için Dexscreener'dan fiyat çek
+        const enriched = await Promise.all(
+          rawTokens.map(async (t) => {
+            if (!t.lp) return { ...t, price: 0, change24h: 0, fdv: 0 };
+            try {
+              const dexRes = await fetch(
+                `https://api.dexscreener.com/latest/dex/pairs/base/${t.lp}`
+              );
+              const dexJson = await dexRes.json();
+              const pair = dexJson.pair || {};
+              return {
+                ...t,
+                price: Number(pair.priceUsd || 0
